@@ -95,7 +95,12 @@ fn main() -> Result<()> {
         };
 
         let rel_path = path.strip_prefix(&abs_path)?.to_string_lossy().into_owned();
-        let mtime = metadata.modified()?.duration_since(UNIX_EPOCH)?.as_nanos() as u64;
+        let mtime = metadata
+            .modified()
+            .ok()
+            .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
+            .map(|d| d.as_nanos() as u64)
+            .unwrap_or(0);
 
         let inode = get_file_index(&path).unwrap_or(None);
 

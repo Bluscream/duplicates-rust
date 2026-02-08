@@ -45,18 +45,24 @@ function Log-Output {
     $formattedMsg | Add-Content -Path $logFile
 }
 
-function Get-DiskSpaceInfo {
+function Get-DiskSpaceRaw {
     $drive = Get-CimInstance Win32_LogicalDisk -Filter "DeviceID='$($targetPath.Substring(0,2))'"
-    $total = [math]::Round($drive.Size / 1GB, 2)
-    $free = [math]::Round($drive.FreeSpace / 1GB, 2)
-    $percent = [math]::Round(($drive.FreeSpace / $drive.Size) * 100, 1)
-    return "$free/${total}GB ($percent%)"
+    return @{ Total = $drive.Size; Free = $drive.FreeSpace }
+}
+
+function Format-DiskInfo {
+    param($Free, $Total)
+    $totalGB = [math]::Round($Total / 1GB, 2)
+    $freeGB = [math]::Round($Free / 1GB, 2)
+    $percent = if ($Total -gt 0) { [math]::Round(($Free / $Total) * 100, 1) } else { 0 }
+    return "$freeGB/${totalGB}GB ($percent%)"
 }
 
 # Clear old log if starting fresh
 $null = New-Item -Path $logFile -ItemType File -Force
 Log-Output "Settings: Path=$targetPath | Keep=$Keep | Mode=$Mode | Algorithm=$Algorithm | Recursive=$Recursive | DryRun=$DryRun | Ignore=$($Ignore -join ',')" "Yellow"
-Log-Output "Free space before: $(Get-DiskSpaceInfo)" "Yellow"
+$initialDisk = Get-DiskSpaceRaw
+Log-Output "Free space before: $(Format-DiskInfo -Free $initialDisk.Free -Total $initialDisk.Total)" "Yellow"
 #endregion
 
 #region Native Helper Methods
@@ -312,5 +318,16 @@ foreach ($g in $finalGroups) {
         } catch { Log-Output "  ERROR processing $($d.RelPath): $_" "Red" }
     }
 }
-Log-Output "Free space after: $(Get-DiskSpaceInfo)" "Yellow"
+$finalDisk = Get-DiskSpaceRaw
+Log-Output "Free space after: $(Format-DiskInfo -Free $finalDisk.Free -Total $finalDisk.Total)" "Yellow"
+if ($null -ne $initialDisk.Free -and $null -ne $finalDisk.Free) {
+    $freedBytes = $finalDisk.Free - $initialDisk.Free
+    if ($freedBytes -gt 0) {
+        $freedGB = [math]::Round($freedBytes / 1GB, 4)
+        $freedPercent = [math]::Round(($freedBytes / $initialDisk.Total) * 100, 3)
+        Log-Output "Total space freed: $freedGB GB ($freedPercent% of total disk space)" "Green"
+    } else {
+        Log-Output "Total space freed: 0 GB (0%)" "Green"
+    }
+}
 #endregion

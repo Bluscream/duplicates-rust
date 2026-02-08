@@ -35,11 +35,15 @@ log_msg() {
     echo -e "[$timestamp] $1" | tee -a "$LOG_FILE"
 }
 
-get_disk_space_info() {
+get_disk_space_raw() {
     local stats=$(df -Pk "$ABS_PATH" 2>/dev/null | tail -n 1)
-    [[ -z "$stats" ]] && { echo "Unknown"; return; }
-    local total_kb=$(echo "$stats" | awk '{print $2}')
-    local free_kb=$(echo "$stats" | awk '{print $4}')
+    [[ -z "$stats" ]] && return 1
+    echo "$stats" | awk '{print $2, $4}'
+}
+
+format_disk_info() {
+    local total_kb=$1
+    local free_kb=$2
     [[ -z "$total_kb" || "$total_kb" -eq 0 ]] && { echo "Unknown"; return; }
     local total_gb=$(( total_kb / 1024 / 1024 ))
     local free_gb=$(( free_kb / 1024 / 1024 ))
@@ -146,7 +150,6 @@ init_environment() {
     IGNORE="$IGNORE,duplicates.log,duplicates.hashes.csv"
     > "$LOG_FILE"
     log_msg "Settings: Path=$ABS_PATH | Keep=$KEEP | Mode=$MODE | Algorithm=$ALGORITHM | Threads=$THREADS"
-    log_msg "Free space before: $(get_disk_space_info)" "Yellow"
 }
 
 parse_args() {
@@ -171,6 +174,13 @@ parse_args() {
 # Execution
 parse_args "$@"
 init_environment
+
+read -r INITIAL_TOTAL INITIAL_FREE <<< "$(get_disk_space_raw)"
+if [[ -n "$INITIAL_TOTAL" ]]; then
+    log_msg "Free space before: $(format_disk_info "$INITIAL_TOTAL" "$INITIAL_FREE")" "Yellow"
+else
+    log_msg "Free space before: Unknown" "Yellow"
+fi
 
 log_msg "Scanning directory..."
 FILES_STR=$(get_files | filter_hardlinks)
@@ -255,5 +265,19 @@ for hash in "${!DUPE_GROUPS[@]}"; do
     done
 done
 
-log_msg "Free space after: $(get_disk_space_info)" "Yellow"
+read -r FINAL_TOTAL FINAL_FREE <<< "$(get_disk_space_raw)"
+if [[ -n "$FINAL_FREE" ]]; then
+    log_msg "Free space after: $(format_disk_info "$FINAL_TOTAL" "$FINAL_FREE")" "Yellow"
+    if [[ -n "$INITIAL_FREE" ]]; then
+        FREED=$(( FINAL_FREE - INITIAL_FREE ))
+        FREED_GB_INT=$(( FREED / 1024 / 1024 ))
+        # For decimal in bash, we can use a quick hack
+        FREED_GB_DEC=$(( (FREED * 100 / 1024 / 1024) % 100 ))
+        FREED_PERCENT=$(( 100 * FREED / INITIAL_TOTAL ))
+        log_msg "Total space freed: $FREED_GB_INT.$FREED_GB_DEC GB ($FREED_PERCENT% of total disk space)" "Green"
+    fi
+else
+    log_msg "Free space after: Unknown" "Yellow"
+fi
+
 log_msg "Done."
