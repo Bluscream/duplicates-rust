@@ -1,16 +1,15 @@
 use anyhow::{Context, Result};
 use clap::{Parser, ValueEnum};
-use colored::*;
 use crc32fast::Hasher;
 use md5::{Digest as Md5Digest, Md5};
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
-use sha2::{Digest as Sha2Digest, Sha256, Sha512};
+use sha2::{Sha256, Sha512};
 use std::collections::{HashMap, HashSet};
 use std::fs::{self, File};
-use std::io::{self, Read, Write};
+use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::UNIX_EPOCH;
 use sysinfo::Disks;
 #[cfg(windows)]
 use std::os::windows::io::AsRawHandle;
