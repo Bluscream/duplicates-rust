@@ -76,14 +76,20 @@ fn main() -> Result<()> {
 
     let pb = ProgressBar::new_spinner();
     pb.set_style(
-        ProgressStyle::default_spinner().template("{spinner:.green} Discovered {pos} files...")?,
+        ProgressStyle::default_spinner().template("{spinner:.green} Discovered {pos} files in {msg} folders...")?,
     );
+    let mut folder_count = 0;
 
     for entry in walker {
         let entry = match entry {
             Ok(e) => e,
             Err(_) => continue,
         };
+        if entry.file_type().is_dir() {
+            folder_count += 1;
+            pb.set_message(folder_count.to_string());
+            continue;
+        }
         if !entry.file_type().is_file() {
             continue;
         }
@@ -114,7 +120,7 @@ fn main() -> Result<()> {
         pb.inc(1);
     }
     pb.finish_and_clear();
-    log!("Found {} total files.", files.len());
+    log!("Found {} total files in {} folders.", files.len(), folder_count);
 
     // 2. Filter hardlinks
     log!("Filtering hardlinks...");
@@ -308,7 +314,7 @@ fn main() -> Result<()> {
             0.0
         };
         log!(
-            "Total space freed: {:.2} GB ({:.2}% of total disk space)",
+            "Total space freed: {:.2} GB ({:.2}%)",
             freed_gb,
             freed_percent
         );
