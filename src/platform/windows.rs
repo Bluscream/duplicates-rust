@@ -20,3 +20,15 @@ pub fn create_symlink(target: &Path, link: &Path) -> Result<()> {
     std::os::windows::fs::symlink_file(target, link)?;
     Ok(())
 }
+
+pub fn is_reparse_point(path: &Path) -> bool {
+    use std::os::windows::fs::MetadataExt;
+    
+    if let Ok(metadata) = std::fs::metadata(path) {
+        // FILE_ATTRIBUTE_REPARSE_POINT = 0x400
+        // This catches symlinks, junctions, and other reparse points
+        metadata.file_attributes() & 0x400 != 0
+    } else {
+        false
+    }
+}

@@ -18,7 +18,7 @@ use walkdir::WalkDir;
 use crate::cache::HashCache;
 use crate::hashing::calculate_hash;
 use crate::models::{Algorithm, Args, FileInfo, HashEntry, KeepCriteria, Mode};
-use crate::platform::{create_symlink, get_file_index};
+use crate::platform::{create_symlink, get_file_index, is_reparse_point};
 use crate::utils::{format_disk_info, get_raw_disk_info};
 
 fn format_size(bytes: u64) -> String {
@@ -131,20 +131,9 @@ fn main() -> Result<()> {
             Err(_) => continue,
         };
 
-        // Skip symlinks (hardcoded, not configurable)
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::FileTypeExt;
-            if entry.file_type().is_symlink() {
-                continue;
-            }
-        }
-        #[cfg(windows)]
-        {
-            use std::os::windows::fs::MetadataExt;
-            if metadata.file_attributes() & 0x400 != 0 {  // FILE_ATTRIBUTE_REPARSE_POINT
-                continue;
-            }
+        // Skip all reparse points (symlinks, junctions, hardlinks, etc.)
+        if is_reparse_point(&path) {
+            continue;
         }
 
         let rel_path = path.strip_prefix(&abs_path)?.to_string_lossy().into_owned();

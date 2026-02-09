@@ -23,3 +23,13 @@ pub fn create_symlink(target: &Path, link: &Path) -> Result<()> {
     #[cfg(not(any(windows, unix)))]
     anyhow::bail!("Symlinks not supported on this platform")
 }
+
+/// Check if a file is a reparse point (symlink, junction, hardlink, etc.)
+pub fn is_reparse_point(path: &Path) -> bool {
+    #[cfg(windows)]
+    return windows::is_reparse_point(path);
+    #[cfg(unix)]
+    return unix::is_reparse_point(path);
+    #[cfg(not(any(windows, unix)))]
+    false
+}
