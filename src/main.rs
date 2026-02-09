@@ -213,10 +213,13 @@ fn main() -> Result<()> {
         // Sort by size: smallest first for better progress perception
         files_to_hash.sort_by_key(|f| f.size);
 
+        let total_bytes: u64 = files_to_hash.iter().map(|f| f.size).sum();
+
         log!(
-            "Cache: {} hits, {} files need hashing",
+            "Cache: {} hits, {} files ({:.2} GB) need hashing",
             cache_hits,
-            files_to_hash.len()
+            files_to_hash.len(),
+            total_bytes as f64 / 1_073_741_824.0
         );
 
         // 5. Open CSV for live appending
@@ -232,10 +235,11 @@ fn main() -> Result<()> {
                 .from_writer(csv_file),
         ));
 
-        // 6. Hash files with live CSV appending
-        let pb = ProgressBar::new(files_to_hash.len() as u64);
+        // 6. Hash files with live CSV appending (progress based on bytes)
+        let pb = ProgressBar::new(total_bytes);
         pb.set_style(ProgressStyle::default_bar()
-            .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} ({eta})")?
+            .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({eta})")
+            .unwrap()
             .progress_chars("#>-"));
 
         let algo = args.algorithm;
@@ -246,7 +250,7 @@ fn main() -> Result<()> {
                 
                 // Validate hash before using it
                 if !validate_hash(&hash, algo) {
-                    pb.inc(1);
+                    pb.inc(f.size);
                     return None;
                 }
 
@@ -264,7 +268,7 @@ fn main() -> Result<()> {
                     let _ = wtr.flush();
                 }
 
-                pb.inc(1);
+                pb.inc(f.size);
                 Some((f, hash))
             })
             .collect();
