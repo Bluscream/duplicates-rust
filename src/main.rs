@@ -125,10 +125,27 @@ fn main() -> Result<()> {
             hash_csv_files.push(path);
             continue;
         }
+        
         let metadata = match fs::metadata(&path) {
             Ok(m) => m,
             Err(_) => continue,
         };
+
+        // Skip symlinks (hardcoded, not configurable)
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::FileTypeExt;
+            if entry.file_type().is_symlink() {
+                continue;
+            }
+        }
+        #[cfg(windows)]
+        {
+            use std::os::windows::fs::MetadataExt;
+            if metadata.file_attributes() & 0x400 != 0 {  // FILE_ATTRIBUTE_REPARSE_POINT
+                continue;
+            }
+        }
 
         let rel_path = path.strip_prefix(&abs_path)?.to_string_lossy().into_owned();
         let mtime = metadata

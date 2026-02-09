@@ -51,7 +51,7 @@ pub struct Args {
     #[arg(short, long, value_enum, default_value = "md5")]
     pub algorithm: Algorithm,
 
-    #[arg(short, long, default_value = "symlink,.lnk,.url")]
+    #[arg(short, long, default_value = ".lnk,.url")]
     pub ignore: String,
 
     #[arg(short, long)]
