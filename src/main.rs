@@ -318,6 +318,22 @@ fn main() -> Result<()> {
 
     // 5. Handling
     log!("Processing groups...");
+    
+    // Count total duplicates to process
+    let total_duplicates: usize = groups
+        .values()
+        .filter(|g| g.len() > 1)
+        .map(|g| g.len() - 1)
+        .sum();
+    
+    let pb = ProgressBar::new(total_duplicates as u64);
+    pb.set_style(
+        ProgressStyle::default_bar()
+            .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} files ({msg})")
+            .unwrap()
+            .progress_chars("#>-"),
+    );
+    
     for (hash, mut group) in groups {
         if group.len() <= 1 {
             continue;
@@ -339,6 +355,8 @@ fn main() -> Result<()> {
         for dup in &group[1..] {
             if args.dry_run {
                 log!("  [DRY RUN] {} -> {:?}", dup.rel_path, args.mode);
+                pb.inc(1);
+                pb.set_message(format!("dry-run {:?}", args.mode));
                 continue;
             }
 
@@ -346,20 +364,25 @@ fn main() -> Result<()> {
                 Mode::Delete => {
                     fs::remove_file(&dup.path)?;
                     log!("  Deleted {}", dup.rel_path);
+                    pb.set_message("deleted");
                 }
                 Mode::Symlink => {
                     fs::remove_file(&dup.path)?;
                     create_symlink(&keep_file.path, &dup.path)?;
                     log!("  Symlinked {}", dup.rel_path);
+                    pb.set_message("symlinked");
                 }
                 Mode::Hardlink => {
                     fs::remove_file(&dup.path)?;
                     fs::hard_link(&keep_file.path, &dup.path)?;
                     log!("  Hardlinked {}", dup.rel_path);
+                    pb.set_message("hardlinked");
                 }
             }
+            pb.inc(1);
         }
     }
+    pb.finish_and_clear();
 
     disks.refresh_list();
     let final_disk_stats = get_raw_disk_info(&abs_path, &disks);
