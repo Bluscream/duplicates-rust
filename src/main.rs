@@ -210,6 +210,9 @@ fn main() -> Result<()> {
             }
         }
 
+        // Sort by size: smallest first for better progress perception
+        files_to_hash.sort_by_key(|f| f.size);
+
         log!(
             "Cache: {} hits, {} files need hashing",
             cache_hits,
